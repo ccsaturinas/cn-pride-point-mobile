@@ -9,6 +9,7 @@ import '../repositories/offline_attendance_repository.dart';
 import '../repositories/providers.dart';
 import 'offline_attendance_details_page.dart';
 import 'scan_page.dart';
+import '../ui/date_format.dart';
 
 class ActivityAttendancePage extends ConsumerStatefulWidget {
   const ActivityAttendancePage({
@@ -203,7 +204,7 @@ class _ActivityAttendancePageState
                                             );
                                             final username =
                                                 authRepo.getLastUsername() ??
-                                                    'admin';
+                                                'admin';
                                             await repo
                                                 .createPendingAttendanceFromScan(
                                                   programId: _programId!,
@@ -308,7 +309,7 @@ class _HostAndPendingList extends StatefulWidget {
 
 class _HostAndPendingListState extends State<_HostAndPendingList> {
   late Future<List<ActivityAttendanceListItem>> _hostFuture;
-  late Future<List<OfflineAttendance>> _pendingFuture;
+  late Future<List<LocalAttendanceViewItem>> _pendingFuture;
 
   @override
   void initState() {
@@ -331,7 +332,7 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
       programId: widget.programId,
       activityId: widget.activityId,
     );
-    _pendingFuture = widget.repo.listNotSynced();
+    _pendingFuture = widget.repo.listNotSyncedViewItems();
   }
 
   void reload() {
@@ -347,16 +348,18 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
       },
       child: ListView(
         children: [
-          FutureBuilder<List<OfflineAttendance>>(
+          FutureBuilder<List<LocalAttendanceViewItem>>(
             future: _pendingFuture,
             builder: (context, snap) {
               final items = snap.data ?? const [];
               final filtered = items
                   .where((p) {
-                    if (p.programId != widget.programId) return false;
+                    if (p.attendance.programId != widget.programId) {
+                      return false;
+                    }
                     final activityId = (widget.activityId ?? '').trim();
                     if (activityId.isEmpty) return true;
-                    return p.activityId == activityId;
+                    return p.attendance.activityId == activityId;
                   })
                   .toList(growable: false);
 
@@ -366,53 +369,132 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
                     ? [const ListTile(title: Text('No pending records'))]
                     : filtered
                           .map(
-                            (p) => ListTile(
-                              title: Text(p.mobileReference.isEmpty ? p.attendeeId : p.mobileReference),
+                            (item) => ListTile(
+                              title: Text(
+                                (item.attendeeDisplayName ?? '').trim().isEmpty
+                                    ? item.attendance.attendeeId
+                                    : item.attendeeDisplayName!,
+                              ),
                               subtitle: Text(
                                 [
-                                  p.attendeeId,
-                                  p.checkedInAt.toIso8601String(),
-                                  if ((p.notes ?? '').trim().isNotEmpty) p.notes!,
-                                ].where((e) => e.toString().trim().isNotEmpty).join(' • '),
-                              ),
-                              trailing: Text(p.syncStatus.name),
-                              onTap: () async {
-                                final saved = await Navigator.of(context).push<bool>(
-                                  MaterialPageRoute(
-                                    builder: (_) => OfflineAttendanceDetailsPage(attendance: p),
+                                  [
+                                        item.programName,
+                                        item.activityName,
+                                        item.attendance.status,
+                                      ]
+                                      .where(
+                                        (e) => (e ?? '')
+                                            .toString()
+                                            .trim()
+                                            .isNotEmpty,
+                                      )
+                                      .join(' • '),
+                                  formatDateTimeYmdHm(
+                                    item.attendance.checkedInAt,
                                   ),
-                                );
+                                ].where((s) => s.trim().isNotEmpty).join('\n'),
+                              ),
+                              trailing: Text(item.attendance.syncStatus.name),
+                              onTap: () async {
+                                final saved = await Navigator.of(context)
+                                    .push<bool>(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            OfflineAttendanceDetailsPage(
+                                              attendance: item.attendance,
+                                            ),
+                                      ),
+                                    );
                                 if (saved == true) {
                                   reload();
                                 }
                               },
                               onLongPress: () async {
-                                final confirmed = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
+                                final action =
+                                    await showModalBottomSheet<String>(
+                                      context: context,
+                                      builder: (context) => SafeArea(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (item.attendance.syncStatus ==
+                                                SyncStatus.error)
+                                              ListTile(
+                                                leading: const Icon(
+                                                  Icons.refresh,
+                                                ),
+                                                title: const Text('Resend'),
+                                                onTap: () => Navigator.of(
+                                                  context,
+                                                ).pop('resend'),
+                                              ),
+                                            ListTile(
+                                              leading: const Icon(Icons.delete),
+                                              title: const Text('Delete'),
+                                              onTap: () => Navigator.of(
+                                                context,
+                                              ).pop('delete'),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(Icons.close),
+                                              title: const Text('Cancel'),
+                                              onTap: () => Navigator.of(
+                                                context,
+                                              ).pop(null),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                if (action == null) return;
+                                if (!context.mounted) return;
+
+                                if (action == 'resend') {
+                                  await widget.repo.resend(
+                                    localId: item.attendance.localId,
+                                  );
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Marked for resend'),
+                                    ),
+                                  );
+                                  reload();
+                                  return;
+                                }
+
+                                if (action == 'delete') {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
                                       title: const Text('Delete record?'),
-                                      content: const Text('This will remove the local record.'),
+                                      content: const Text(
+                                        'This will remove the local record.',
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.of(context).pop(false),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
                                           child: const Text('Cancel'),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.of(context).pop(true),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
                                           child: const Text('Delete'),
                                         ),
                                       ],
-                                    );
-                                  },
-                                );
-                                if (confirmed != true) return;
-                                await widget.repo.delete(localId: p.localId);
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Deleted')),
-                                );
-                                reload();
+                                    ),
+                                  );
+                                  if (confirmed != true) return;
+                                  await widget.repo.delete(
+                                    localId: item.attendance.localId,
+                                  );
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Deleted')),
+                                  );
+                                  reload();
+                                }
                               },
                             ),
                           )
@@ -454,15 +536,13 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
                         title: Text(i.attendeeDisplayName ?? i.id),
                         subtitle: Text(
                           [
-                                i.programName,
-                                i.activityName,
-                                i.checkedInAt,
-                                i.status,
-                              ]
-                              .where(
-                                (e) => (e ?? '').toString().trim().isNotEmpty,
-                              )
-                              .join(' • '),
+                            [i.programName, i.activityName, i.status]
+                                .where(
+                                  (e) => (e ?? '').toString().trim().isNotEmpty,
+                                )
+                                .join(' • '),
+                            formatDateTimeStringYmdHm(i.checkedInAt),
+                          ].where((s) => s.trim().isNotEmpty).join('\n'),
                         ),
                       ),
                     )

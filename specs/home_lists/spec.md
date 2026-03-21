@@ -695,7 +695,9 @@ Example response:
 - On tap of a pending item, open an Activity Attendance Details screen:
   - show key fields (Program, Activity, Attendee, checkedInAt, status, mobileReference, syncStatus)
   - allow editing `notes` and saving it to local storage
-- On long-press of a pending item, show a confirmation dialog to delete the record.
+- On long-press of a pending item:
+  - If `syncStatus = ERROR`, allow user to “Resend” (sets status back to PENDING for next sync).
+  - Allow user to delete the record (with confirmation).
 
 ## State Management
 Use Riverpod for list state:

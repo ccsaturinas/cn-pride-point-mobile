@@ -10,7 +10,7 @@
 - [ ] Activity Attendance List scan is enabled only when Program and Activity selected
 - [ ] Activity Attendance List shows sync button for pending local records
 - [ ] Pending attendance item opens details screen to edit notes
-- [ ] Long-press pending attendance item confirms delete
+- [ ] Long-press pending attendance item supports resend or delete
 
 ## Data
 - [ ] List retrieval uses the persisted `HOST_URL`

@@ -55,13 +55,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Center(
+                  child: Image.asset(
+                    'assets/cn_lions_logo.png',
+                    width: 220,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 if (_history.isNotEmpty)
                   DropdownButtonFormField<String>(
                     value: _history.contains(_hostController.text.trim())
@@ -141,6 +149,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 12),
                 ],
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
                   onPressed: isLoading
                       ? null
                       : () async {

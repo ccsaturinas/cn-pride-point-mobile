@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/entities.dart';
 import '../repositories/providers.dart';
+import '../ui/date_format.dart';
 
 class OfflineAttendanceDetailsPage extends ConsumerStatefulWidget {
   const OfflineAttendanceDetailsPage({super.key, required this.attendance});
@@ -32,6 +33,7 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(offlineAttendanceRepositoryProvider);
+    final entityRepo = ref.watch(entitySyncRepositoryProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Attendance Details')),
@@ -41,62 +43,93 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
           error: (e, _) => Center(child: Text(e.toString())),
           data: (repo) {
             final a = widget.attendance;
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _kv('Mobile reference', a.mobileReference),
-                  _kv('Sync status', a.syncStatus.name),
-                  if ((a.lastSyncError ?? '').trim().isNotEmpty) _kv('Last sync error', a.lastSyncError!),
-                  _kv('Program id', a.programId),
-                  _kv('Activity id', a.activityId),
-                  _kv('Attendee id', a.attendeeId),
-                  _kv('Checked in at', a.checkedInAt.toIso8601String()),
-                  _kv('Status', a.status),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _notesController,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _saving
-                        ? null
-                        : () async {
-                            setState(() => _saving = true);
-                            try {
-                              await repo.updateNotes(
-                                localId: a.localId,
-                                notes: _notesController.text.trim().isEmpty
-                                    ? null
-                                    : _notesController.text.trim(),
-                              );
-                              if (!context.mounted) return;
-                              Navigator.of(context).pop(true);
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.toString())),
-                              );
-                            } finally {
-                              if (mounted) setState(() => _saving = false);
-                            }
-                          },
-                    child: _saving
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
+            return entityRepo.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text(e.toString())),
+              data: (entityRepo) {
+                return FutureBuilder(
+                  future: Future.wait([
+                    entityRepo.listPrograms(),
+                    entityRepo.listActivities(),
+                    entityRepo.listAttendees(),
+                  ]),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final programs = snapshot.data![0] as List<Program>;
+                    final activities = snapshot.data![1] as List<Activity>;
+                    final attendees = snapshot.data![2] as List<Attendee>;
+
+                    final programName = programs.where((p) => p.id == a.programId).map((p) => p.name).firstOrNull;
+                    final activityName = activities.where((p) => p.id == a.activityId).map((p) => p.name).firstOrNull;
+                    final attendeeName = attendees
+                        .where((p) => p.id == a.attendeeId)
+                        .map((p) => (p.displayName ?? '${p.lastName ?? ''} ${p.firstName ?? ''}'.trim()).trim())
+                        .firstOrNull;
+
+                    return Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _kv('Mobile reference', a.mobileReference),
+                          _kv('Sync status', a.syncStatus.name),
+                          if ((a.lastSyncError ?? '').trim().isNotEmpty)
+                            _kv('Last sync error', a.lastSyncError!),
+                          _kv('Program', (programName ?? a.programId).trim()),
+                          _kv('Activity', (activityName ?? a.activityId).trim()),
+                          _kv('Attendee', (attendeeName ?? a.attendeeId).trim()),
+                          _kv('Checked in at', formatDateTimeYmdHm(a.checkedInAt)),
+                          _kv('Status', a.status),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _notesController,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              labelText: 'Notes',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const Spacer(),
+                          FilledButton(
+                            onPressed: _saving
+                                ? null
+                                : () async {
+                                    setState(() => _saving = true);
+                                    try {
+                                      await repo.updateNotes(
+                                        localId: a.localId,
+                                        notes: _notesController.text.trim().isEmpty
+                                            ? null
+                                            : _notesController.text.trim(),
+                                      );
+                                      if (!context.mounted) return;
+                                      Navigator.of(context).pop(true);
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(e.toString())),
+                                      );
+                                    } finally {
+                                      if (mounted) setState(() => _saving = false);
+                                    }
+                                  },
+                            child: _saving
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Save'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             );
           },
         ),
@@ -118,3 +151,6 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
   }
 }
 
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
+}

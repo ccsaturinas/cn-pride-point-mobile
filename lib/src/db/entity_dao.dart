@@ -330,6 +330,18 @@ class EntityDao {
     );
   }
 
+  Future<void> markOfflineAttendancePending({required int localId}) async {
+    await _db.raw.update(
+      'activity_attendance_queue',
+      {
+        'syncStatus': SyncStatus.pending.name,
+        'lastSyncError': null,
+      },
+      where: 'localId = ?',
+      whereArgs: [localId],
+    );
+  }
+
   Future<void> updateOfflineAttendanceNotes({
     required int localId,
     required String? notes,

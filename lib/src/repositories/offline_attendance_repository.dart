@@ -4,6 +4,20 @@ import '../db/entity_dao.dart';
 import '../models/activity_attendance.dart';
 import '../models/entities.dart';
 
+class LocalAttendanceViewItem {
+  const LocalAttendanceViewItem({
+    required this.attendance,
+    required this.programName,
+    required this.activityName,
+    required this.attendeeDisplayName,
+  });
+
+  final OfflineAttendance attendance;
+  final String? programName;
+  final String? activityName;
+  final String? attendeeDisplayName;
+}
+
 class OfflineAttendanceRepository {
   OfflineAttendanceRepository({required ApiClient api, required EntityDao dao})
     : _api = api,
@@ -120,16 +134,53 @@ class OfflineAttendanceRepository {
   Future<List<OfflineAttendance>> listPending() =>
       _dao.listPendingOfflineAttendance();
 
-  Future<List<OfflineAttendance>> listNotSynced() => _dao.listOfflineAttendanceNotSynced();
+  Future<List<OfflineAttendance>> listNotSynced() =>
+      _dao.listOfflineAttendanceNotSynced();
 
   Future<int> pendingCount() async => (await listPending()).length;
 
-  Future<void> updateNotes({required int localId, required String? notes}) async {
+  Future<void> updateNotes({
+    required int localId,
+    required String? notes,
+  }) async {
     await _dao.updateOfflineAttendanceNotes(localId: localId, notes: notes);
   }
 
   Future<void> delete({required int localId}) async {
     await _dao.deleteOfflineAttendance(localId: localId);
+  }
+
+  Future<void> resend({required int localId}) async {
+    await _dao.markOfflineAttendancePending(localId: localId);
+  }
+
+  Future<List<LocalAttendanceViewItem>> listNotSyncedViewItems() async {
+    final list = await _dao.listOfflineAttendanceNotSynced();
+    if (list.isEmpty) return const [];
+
+    final programs = await _dao.listPrograms();
+    final activities = await _dao.listActivities();
+    final attendees = await _dao.listAttendees();
+
+    final programNameById = {for (final p in programs) p.id: p.name};
+    final activityNameById = {for (final a in activities) a.id: a.name};
+    final attendeeNameById = {
+      for (final a in attendees)
+        a.id:
+            (a.displayName ?? '${a.lastName ?? ''} ${a.firstName ?? ''}'.trim())
+                .trim(),
+    };
+
+    return list
+        .map(
+          (a) => LocalAttendanceViewItem(
+            attendance: a,
+            programName: programNameById[a.programId],
+            activityName: activityNameById[a.activityId],
+            attendeeDisplayName: attendeeNameById[a.attendeeId],
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<SyncResult> syncPending(AuthSession session) async {
@@ -162,7 +213,10 @@ class OfflineAttendanceRepository {
       throw const ApiException(statusCode: 200, body: 'Invalid sync response');
     }
 
-    final resolution = resolveSyncResponse(pending: pending, response: response);
+    final resolution = resolveSyncResponse(
+      pending: pending,
+      response: response,
+    );
 
     for (final e in resolution.errorByLocalId.entries) {
       await _dao.markOfflineAttendanceError(
@@ -178,7 +232,10 @@ class OfflineAttendanceRepository {
       );
     }
 
-    return SyncResult(hasErrors: resolution.hasErrors, updated: resolution.updated);
+    return SyncResult(
+      hasErrors: resolution.hasErrors,
+      updated: resolution.updated,
+    );
   }
 }
 
@@ -235,8 +292,9 @@ SyncResolution resolveSyncResponse({
       continue;
     }
 
-    errorByLocalId[local.localId] =
-        (notes == null || notes.trim().isEmpty) ? 'Missing id in sync response' : notes;
+    errorByLocalId[local.localId] = (notes == null || notes.trim().isEmpty)
+        ? 'Missing id in sync response'
+        : notes;
     updated += 1;
   }
 
