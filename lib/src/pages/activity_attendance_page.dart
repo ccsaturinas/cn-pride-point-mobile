@@ -9,6 +9,7 @@ import '../repositories/offline_attendance_repository.dart';
 import '../repositories/providers.dart';
 import '../ui/error_text.dart';
 import '../ui/cn_app_bar.dart';
+import '../ui/screen_title_bar.dart';
 import 'offline_attendance_details_page.dart';
 import 'scan_page.dart';
 import '../ui/date_format.dart';
@@ -55,244 +56,284 @@ class _ActivityAttendancePageState
       appBar: cnAppBar(
         context: context,
         onLogout: () => ref.read(authSessionProvider.notifier).logout(),
-        extraActions: [
-          offlineRepo.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (repo) {
-              return FutureBuilder<int>(
-                future: repo.pendingCount(),
-                builder: (context, snapshot) {
-                  final count = snapshot.data ?? 0;
-                  return IconButton(
-                    onPressed: count == 0
-                        ? null
-                        : () async {
-                            try {
-                              final result = await repo.syncPending(session);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    result.hasErrors
-                                        ? 'Sync completed with errors'
-                                        : 'Sync completed',
-                                  ),
-                                ),
-                              );
-                              setState(() {});
-                              _listKey.currentState?.reload();
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              if (friendlyErrorText(e) == 'No connection') {
-                                ref.read(sessionNoticeProvider.notifier).state =
-                                    'No connection. Working offline.';
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(friendlyErrorText(e))),
-                              );
-                            }
-                          },
-                    icon: const Icon(Icons.sync),
-                    tooltip: count == 0
-                        ? 'No pending records'
-                        : 'Sync pending ($count)',
-                  );
-                },
-              );
-            },
-          ),
-        ],
+        extraActions: const [],
       ),
       body: SafeArea(
-        child: entityRepo.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text(e.toString())),
-          data: (entityRepo) {
-            return FutureBuilder(
-              future: Future.wait([
-                entityRepo.listPrograms(),
-                entityRepo.listActivities(),
-              ]),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final programs = snapshot.data![0] as List<Program>;
-                final activities = snapshot.data![1] as List<Activity>;
+        child: Column(
+          children: [
+            ScreenTitleBar(
+              title: 'Activity Attendance',
+              actions: [
+                offlineRepo.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (repo) {
+                    return FutureBuilder<int>(
+                      future: repo.pendingCount(),
+                      builder: (context, snapshot) {
+                        final count = snapshot.data ?? 0;
+                        return IconButton(
+                          onPressed: count == 0
+                              ? null
+                              : () async {
+                                  try {
+                                    final authedSession = await ref
+                                        .read(authSessionProvider.notifier)
+                                        .sessionForNetwork();
+                                    final result = await repo.syncPending(
+                                      authedSession,
+                                    );
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          result.hasErrors
+                                              ? 'Sync completed with errors'
+                                              : 'Sync completed',
+                                        ),
+                                      ),
+                                    );
+                                    setState(() {});
+                                    _listKey.currentState?.reload();
+                                  } catch (e) {
+                                    if (!context.mounted) return;
+                                    if (friendlyErrorText(e) ==
+                                        'No connection') {
+                                      ref
+                                              .read(
+                                                sessionNoticeProvider.notifier,
+                                              )
+                                              .state =
+                                          'No connection. Working offline.';
+                                    }
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(friendlyErrorText(e)),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.sync),
+                          tooltip: count == 0
+                              ? 'No pending records'
+                              : 'Sync pending ($count)',
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+            Expanded(
+              child: entityRepo.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text(e.toString())),
+                data: (entityRepo) {
+                  return FutureBuilder(
+                    future: Future.wait([
+                      entityRepo.listPrograms(),
+                      entityRepo.listActivities(),
+                    ]),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final programs = snapshot.data![0] as List<Program>;
+                      final activities = snapshot.data![1] as List<Activity>;
 
-                final selectedProgram = programs
-                    .where((p) => p.id == _programId)
-                    .cast<Program?>()
-                    .firstOrNull;
-                final selectedActivity = activities
-                    .where((a) => a.id == _activityId)
-                    .cast<Activity?>()
-                    .firstOrNull;
+                      final selectedProgram = programs
+                          .where((p) => p.id == _programId)
+                          .cast<Program?>()
+                          .firstOrNull;
+                      final selectedActivity = activities
+                          .where((a) => a.id == _activityId)
+                          .cast<Activity?>()
+                          .firstOrNull;
 
-                return Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: selectedProgram?.id,
-                        items: programs
-                            .map(
-                              (p) => DropdownMenuItem(
-                                value: p.id,
-                                child: Text(
-                                  p.name,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(growable: false),
-                        onChanged: (v) => setState(() => _programId = v),
-                        decoration: const InputDecoration(
-                          labelText: 'Program',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String?>(
-                        value: selectedActivity?.id,
-                        items: [
-                          const DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text('None'),
-                          ),
-                          ...activities.map(
-                            (a) => DropdownMenuItem(
-                              value: a.id,
-                              child: Text(
-                                a.name,
-                                overflow: TextOverflow.ellipsis,
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<String>(
+                              value: selectedProgram?.id,
+                              items: programs
+                                  .map(
+                                    (p) => DropdownMenuItem(
+                                      value: p.id,
+                                      child: Text(
+                                        p.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                              onChanged: (v) => setState(() => _programId = v),
+                              decoration: const InputDecoration(
+                                labelText: 'Program',
+                                border: OutlineInputBorder(),
                               ),
                             ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => _activityId = v),
-                        decoration: const InputDecoration(
-                          labelText: 'Activity (optional)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      offlineRepo.when(
-                        loading: () => const SizedBox.shrink(),
-                        error: (e, _) => Text(e.toString()),
-                        data: (repo) {
-                          final scanEnabled =
-                              (_programId ?? '').isNotEmpty &&
-                              (_activityId ?? '').isNotEmpty;
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: !scanEnabled
-                                      ? null
-                                      : () async {
-                                          final code =
-                                              await Navigator.of(
-                                                context,
-                                              ).push<String>(
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      const ScanPage(),
-                                                ),
-                                              );
-                                          if (code == null ||
-                                              code.trim().isEmpty) {
-                                            return;
-                                          }
-                                          try {
-                                            final authRepo = await ref.read(
-                                              authRepositoryProvider.future,
-                                            );
-                                            final username =
-                                                authRepo.getLastUsername() ??
-                                                'admin';
-                                            await repo
-                                                .createPendingAttendanceFromScan(
-                                                  programId: _programId!,
-                                                  activityId: _activityId!,
-                                                  scannedCode: code,
-                                                  username: username,
-                                                );
-                                            if (!context.mounted) return;
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Added pending attendance',
-                                                ),
-                                              ),
-                                            );
-                                            setState(() {});
-                                            _listKey.currentState?.reload();
-                                          } on AttendeeNotFoundException {
-                                            if (!context.mounted) return;
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Attendee not found',
-                                                ),
-                                              ),
-                                            );
-                                          } catch (e) {
-                                            if (!context.mounted) return;
-                                            if (friendlyErrorText(e) == 'No connection') {
-                                              ref.read(sessionNoticeProvider.notifier).state = 'No connection. Working offline.';
-                                            }
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(friendlyErrorText(e)),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                  icon: const Icon(Icons.qr_code_scanner),
-                                  label: const Text('Scan'),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String?>(
+                              value: selectedActivity?.id,
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('None'),
                                 ),
+                                ...activities.map(
+                                  (a) => DropdownMenuItem(
+                                    value: a.id,
+                                    child: Text(
+                                      a.name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) => setState(() => _activityId = v),
+                              decoration: const InputDecoration(
+                                labelText: 'Activity (optional)',
+                                border: OutlineInputBorder(),
                               ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: offlineRepo.when(
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(child: Text(e.toString())),
-                          data: (repo) {
-                            final programId = _programId;
-                            if (programId == null || programId.isEmpty) {
-                              return const Center(
-                                child: Text('Select a program'),
-                              );
-                            }
-                            return _HostAndPendingList(
-                              key: _listKey,
-                              session: session,
-                              repo: repo,
-                              programId: programId,
-                              activityId: _activityId,
-                            );
-                          },
+                            ),
+                            const SizedBox(height: 12),
+                            offlineRepo.when(
+                              loading: () => const SizedBox.shrink(),
+                              error: (e, _) => Text(e.toString()),
+                              data: (repo) {
+                                final scanEnabled =
+                                    (_programId ?? '').isNotEmpty &&
+                                    (_activityId ?? '').isNotEmpty;
+                                return Row(
+                                  children: [
+                                    Expanded(
+                                      child: FilledButton.icon(
+                                        onPressed: !scanEnabled
+                                            ? null
+                                            : () async {
+                                                final code =
+                                                    await Navigator.of(
+                                                      context,
+                                                    ).push<String>(
+                                                      MaterialPageRoute(
+                                                        builder: (_) =>
+                                                            const ScanPage(),
+                                                      ),
+                                                    );
+                                                if (code == null ||
+                                                    code.trim().isEmpty) {
+                                                  return;
+                                                }
+                                                try {
+                                                  final authRepo = await ref
+                                                      .read(
+                                                        authRepositoryProvider
+                                                            .future,
+                                                      );
+                                                  final username =
+                                                      authRepo
+                                                          .getLastUsername() ??
+                                                      'admin';
+                                                  await repo
+                                                      .createPendingAttendanceFromScan(
+                                                        programId: _programId!,
+                                                        activityId:
+                                                            _activityId!,
+                                                        scannedCode: code,
+                                                        username: username,
+                                                      );
+                                                  if (!context.mounted) return;
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Added pending attendance',
+                                                      ),
+                                                    ),
+                                                  );
+                                                  setState(() {});
+                                                  _listKey.currentState
+                                                      ?.reload();
+                                                } on AttendeeNotFoundException {
+                                                  if (!context.mounted) return;
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Attendee not found',
+                                                      ),
+                                                    ),
+                                                  );
+                                                } catch (e) {
+                                                  if (!context.mounted) return;
+                                                  if (friendlyErrorText(e) ==
+                                                      'No connection') {
+                                                    ref
+                                                            .read(
+                                                              sessionNoticeProvider
+                                                                  .notifier,
+                                                            )
+                                                            .state =
+                                                        'No connection. Working offline.';
+                                                  }
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        friendlyErrorText(e),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                        icon: const Icon(Icons.qr_code_scanner),
+                                        label: const Text('Scan'),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: offlineRepo.when(
+                                loading: () => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                error: (e, _) =>
+                                    Center(child: Text(e.toString())),
+                                data: (repo) {
+                                  final programId = _programId;
+                                  if (programId == null || programId.isEmpty) {
+                                    return const Center(
+                                      child: Text('Select a program'),
+                                    );
+                                  }
+                                  return _HostAndPendingList(
+                                    key: _listKey,
+                                    getSessionForHost: () => ref
+                                        .read(authSessionProvider.notifier)
+                                        .sessionForNetwork(),
+                                    repo: repo,
+                                    programId: programId,
+                                    activityId: _activityId,
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -302,13 +343,13 @@ class _ActivityAttendancePageState
 class _HostAndPendingList extends StatefulWidget {
   const _HostAndPendingList({
     super.key,
-    required this.session,
+    required this.getSessionForHost,
     required this.repo,
     required this.programId,
     required this.activityId,
   });
 
-  final AuthSession session;
+  final Future<AuthSession> Function() getSessionForHost;
   final OfflineAttendanceRepository repo;
   final String programId;
   final String? activityId;
@@ -337,11 +378,14 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
   }
 
   void _reload() {
-    _hostFuture = widget.repo.listFromHost(
-      session: widget.session,
-      programId: widget.programId,
-      activityId: widget.activityId,
-    );
+    _hostFuture = (() async {
+      final session = await widget.getSessionForHost();
+      return widget.repo.listFromHost(
+        session: session,
+        programId: widget.programId,
+        activityId: widget.activityId,
+      );
+    })();
     _pendingFuture = widget.repo.listNotSyncedViewItems();
   }
 

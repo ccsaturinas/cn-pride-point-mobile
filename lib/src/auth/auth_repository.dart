@@ -67,7 +67,7 @@ class AuthRepository {
     await _tokenStorage.clear();
   }
 
-  Future<AuthSession?> refreshIfExpired(AuthSession session) async {
+  Future<AuthSession> refreshIfExpired(AuthSession session) async {
     if (!session.isExpired) return session;
     final refreshToken = session.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) return session;
@@ -94,8 +94,7 @@ class AuthRepository {
       return next;
     } on AuthApiException catch (e) {
       if (e.statusCode == 400 || e.statusCode == 401) {
-        await _tokenStorage.clear();
-        return null;
+        throw const AuthRefreshInvalidException();
       }
       rethrow;
     }
@@ -124,4 +123,8 @@ class AppHttpClient {
   AppHttpClient(this.client);
 
   final http.Client client;
+}
+
+class AuthRefreshInvalidException implements Exception {
+  const AuthRefreshInvalidException();
 }

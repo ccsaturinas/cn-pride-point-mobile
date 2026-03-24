@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/providers.dart';
 import '../ui/cn_app_bar.dart';
+import '../ui/screen_title_bar.dart';
 import 'activity_attendance_entry_page.dart';
 import 'entity_list_page.dart';
 
@@ -17,82 +18,93 @@ class HomePage extends ConsumerWidget {
       appBar: cnAppBar(
         context: context,
         onLogout: () => ref.read(authSessionProvider.notifier).logout(),
+        showLogo: true,
       ),
-      body: ListView(
-        children: [
-          if (notice != null && notice.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: MaterialBanner(
-                content: Text(notice),
-                actions: [
-                  TextButton(
-                    onPressed: () => ref.read(sessionNoticeProvider.notifier).state = null,
-                    child: const Text('Dismiss'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const ScreenTitleBar(title: 'Home'),
+            if (notice != null && notice.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: MaterialBanner(
+                  content: Text(notice),
+                  actions: [
+                    TextButton(
+                      onPressed: () =>
+                          ref.read(sessionNoticeProvider.notifier).state = null,
+                      child: const Text('Dismiss'),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: ListView(
+                children: [
+                  ListTile(
+                    title: const Text('Programs'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EntityListPage(entity: EntityType.programs),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Activities'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EntityListPage(entity: EntityType.activities),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Activity Attendance List'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ActivityAttendanceEntryPage(),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Attendees'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EntityListPage(entity: EntityType.attendees),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Sections'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EntityListPage(entity: EntityType.sections),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Year levels'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EntityListPage(entity: EntityType.yearLevels),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-          ListTile(
-            title: const Text('Programs'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    const EntityListPage(entity: EntityType.programs),
-              ),
-            ),
-          ),
-          ListTile(
-            title: const Text('Activities'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    const EntityListPage(entity: EntityType.activities),
-              ),
-            ),
-          ),
-          ListTile(
-            title: const Text('Activity Attendance List'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const ActivityAttendanceEntryPage(),
-              ),
-            ),
-          ),
-          ListTile(
-            title: const Text('Attendees'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    const EntityListPage(entity: EntityType.attendees),
-              ),
-            ),
-          ),
-          ListTile(
-            title: const Text('Sections'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    const EntityListPage(entity: EntityType.sections),
-              ),
-            ),
-          ),
-          ListTile(
-            title: const Text('Year levels'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    const EntityListPage(entity: EntityType.yearLevels),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

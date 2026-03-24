@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
+import '../ui/error_text.dart';
 import 'auth_api.dart';
 import 'auth_repository.dart';
 import 'auth_session.dart';
@@ -60,13 +61,38 @@ class AuthSessionController extends AsyncNotifier<AuthSession?> {
   Future<AuthSession?> build() async {
     final repo = await ref.watch(authRepositoryProvider.future);
     ref.read(sessionNoticeProvider.notifier).state = null;
-    final cached = await repo.readCachedSession();
-    if (cached == null) return null;
+    return repo.readCachedSession();
+  }
+
+  Future<AuthSession> sessionForNetwork() async {
+    final current = state.value;
+    if (current == null) {
+      ref.read(sessionNoticeProvider.notifier).state =
+          'Session expired. Continue offline or logout to login again.';
+      throw const SessionExpiredException();
+    }
+    if (!current.isExpired) return current;
+
+    final refreshToken = current.refreshToken;
+    if (refreshToken == null || refreshToken.trim().isEmpty) {
+      ref.read(sessionNoticeProvider.notifier).state =
+          'Session expired. Continue offline or logout to login again.';
+      throw const SessionExpiredException();
+    }
+
+    final repo = await ref.read(authRepositoryProvider.future);
     try {
-      return await repo.refreshIfExpired(cached);
+      final refreshed = await repo.refreshIfExpired(current);
+      state = AsyncData(refreshed);
+      return refreshed;
+    } on AuthRefreshInvalidException {
+      ref.read(sessionNoticeProvider.notifier).state =
+          'Session expired. Continue offline or logout to login again.';
+      throw const SessionExpiredException();
     } catch (_) {
-      ref.read(sessionNoticeProvider.notifier).state = 'No connection. Working offline.';
-      return cached;
+      ref.read(sessionNoticeProvider.notifier).state =
+          'No connection. Working offline.';
+      throw const NoConnectionException();
     }
   }
 

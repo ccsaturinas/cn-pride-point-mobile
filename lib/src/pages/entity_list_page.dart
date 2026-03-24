@@ -9,6 +9,7 @@ import '../ui/cn_app_bar.dart';
 import 'activity_details_page.dart';
 import '../ui/date_format.dart';
 import 'program_details_page.dart';
+import '../ui/screen_title_bar.dart';
 
 enum EntityType { programs, activities, attendees, sections, yearLevels }
 
@@ -91,8 +92,16 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
   }
 
   Future<void> _refreshFromHost() async {
-    final session = ref.read(authSessionProvider).value;
-    if (session == null) return;
+    final session = await () async {
+      try {
+        return await ref.read(authSessionProvider.notifier).sessionForNetwork();
+      } catch (e) {
+        if (mounted) {
+          setState(() => _error = friendlyErrorText(e));
+        }
+        rethrow;
+      }
+    }();
 
     setState(() {
       _loading = true;
@@ -131,111 +140,131 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final title = switch (widget.entity) {
+      EntityType.programs => 'Programs',
+      EntityType.activities => 'Activities',
+      EntityType.attendees => 'Attendees',
+      EntityType.sections => 'Sections',
+      EntityType.yearLevels => 'Year levels',
+    };
+
     return Scaffold(
       appBar: cnAppBar(
         context: context,
         onLogout: () => ref.read(authSessionProvider.notifier).logout(),
-        extraActions: [
-          if (widget.entity == EntityType.programs)
-            IconButton(
-              onPressed: _loading ? null : _toggleProgramSort,
-              icon: const Icon(Icons.sort),
-              tooltip: _programSortAsc
-                  ? 'Sort by Startdate (ASC)'
-                  : 'Sort by Startdate (DESC)',
-            ),
-          IconButton(
-            onPressed: _loading ? null : _refreshFromHost,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Update from host',
-          ),
-        ],
+        extraActions: const [],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Failed to load'),
-                      const SizedBox(height: 12),
-                      Text(_error!, textAlign: TextAlign.center),
-                      const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: _refreshFromHost,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+        child: Column(
+          children: [
+            ScreenTitleBar(
+              title: title,
+              actions: [
+                if (widget.entity == EntityType.programs)
+                  IconButton(
+                    onPressed: _loading ? null : _toggleProgramSort,
+                    icon: const Icon(Icons.sort),
+                    tooltip: _programSortAsc
+                        ? 'Sort by Startdate (ASC)'
+                        : 'Sort by Startdate (DESC)',
                   ),
+                IconButton(
+                  onPressed: _loading ? null : _refreshFromHost,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Update from host',
                 ),
-              )
-            : _items.isEmpty
-            ? const Center(child: Text('No items'))
-            : ListView.separated(
-                itemCount: _items.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = _items[index];
-                  return switch (item) {
-                    final Program p => ListTile(
-                      title: Text(p.name),
-                      subtitle: Text(
-                        [
-                          [
-                            formatDateTimeStringYmdHm(p.startDate),
-                            p.type ?? '',
-                          ].where((s) => s.trim().isNotEmpty).join(' | '),
-                          p.status ?? '',
-                        ].where((s) => s.trim().isNotEmpty).join('\n'),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ProgramDetailsPage(program: p),
+              ],
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Failed to load'),
+                            const SizedBox(height: 12),
+                            Text(_error!, textAlign: TextAlign.center),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: _refreshFromHost,
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
                       ),
+                    )
+                  : _items.isEmpty
+                  ? const Center(child: Text('No items'))
+                  : ListView.separated(
+                      itemCount: _items.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final item = _items[index];
+                        return switch (item) {
+                          final Program p => ListTile(
+                            title: Text(p.name),
+                            subtitle: Text(
+                              [
+                                [
+                                  formatDateTimeStringYmdHm(p.startDate),
+                                  p.type ?? '',
+                                ].where((s) => s.trim().isNotEmpty).join(' | '),
+                                p.status ?? '',
+                              ].where((s) => s.trim().isNotEmpty).join('\n'),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ProgramDetailsPage(program: p),
+                              ),
+                            ),
+                          ),
+                          final Activity a => ListTile(
+                            title: Text(a.name),
+                            subtitle: Text(
+                              [
+                                [
+                                  formatDateTimeStringYmdHm(a.startDate),
+                                  a.activityType ?? '',
+                                ].where((s) => s.trim().isNotEmpty).join(' | '),
+                                a.status ?? '',
+                              ].where((s) => s.trim().isNotEmpty).join('\n'),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ActivityDetailsPage(activity: a),
+                              ),
+                            ),
+                          ),
+                          final YearLevel y => ListTile(
+                            title: Text(y.name),
+                            subtitle: Text(y.status ?? ''),
+                          ),
+                          final Section s => ListTile(
+                            title: Text(s.name),
+                            subtitle: Text(s.status ?? ''),
+                          ),
+                          final Attendee a => ListTile(
+                            title: Text(
+                              a.displayName ??
+                                  '${a.lastName ?? ''} ${a.firstName ?? ''}'
+                                      .trim(),
+                            ),
+                            subtitle: Text(a.code ?? ''),
+                          ),
+                          _ => const SizedBox.shrink(),
+                        };
+                      },
                     ),
-                    final Activity a => ListTile(
-                      title: Text(a.name),
-                      subtitle: Text(
-                        [
-                          [
-                            formatDateTimeStringYmdHm(a.startDate),
-                            a.activityType ?? '',
-                          ].where((s) => s.trim().isNotEmpty).join(' | '),
-                          a.status ?? '',
-                        ].where((s) => s.trim().isNotEmpty).join('\n'),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ActivityDetailsPage(activity: a),
-                        ),
-                      ),
-                    ),
-                    final YearLevel y => ListTile(
-                      title: Text(y.name),
-                      subtitle: Text(y.status ?? ''),
-                    ),
-                    final Section s => ListTile(
-                      title: Text(s.name),
-                      subtitle: Text(s.status ?? ''),
-                    ),
-                    final Attendee a => ListTile(
-                      title: Text(
-                        a.displayName ??
-                            '${a.lastName ?? ''} ${a.firstName ?? ''}'.trim(),
-                      ),
-                      subtitle: Text(a.code ?? ''),
-                    ),
-                    _ => const SizedBox.shrink(),
-                  };
-                },
-              ),
+            ),
+          ],
+        ),
       ),
     );
   }
