@@ -32,7 +32,7 @@ class HomePage extends ConsumerWidget {
                   actions: [
                     TextButton(
                       onPressed: () =>
-                          ref.read(sessionNoticeProvider.notifier).state = null,
+                          ref.read(sessionNoticeProvider.notifier).clear(),
                       child: const Text('Dismiss'),
                     ),
                   ],

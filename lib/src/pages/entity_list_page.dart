@@ -127,8 +127,9 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
       if (mounted) {
         setState(() => _error = friendlyErrorText(e));
         if (_error == 'No connection') {
-          ref.read(sessionNoticeProvider.notifier).state =
-              'No connection. Working offline.';
+          ref
+              .read(sessionNoticeProvider.notifier)
+              .set('No connection. Working offline.');
         }
       }
     } finally {

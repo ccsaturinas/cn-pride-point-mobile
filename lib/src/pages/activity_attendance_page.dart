@@ -103,8 +103,9 @@ class _ActivityAttendancePageState
                                               .read(
                                                 sessionNoticeProvider.notifier,
                                               )
-                                              .state =
-                                          'No connection. Working offline.';
+                                              .set(
+                                                'No connection. Working offline.',
+                                              );
                                     }
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -276,8 +277,9 @@ class _ActivityAttendancePageState
                                                               sessionNoticeProvider
                                                                   .notifier,
                                                             )
-                                                            .state =
-                                                        'No connection. Working offline.';
+                                                            .set(
+                                                              'No connection. Working offline.',
+                                                            );
                                                   }
                                                   ScaffoldMessenger.of(
                                                     context,

@@ -48,8 +48,26 @@ final authRepositoryProvider = FutureProvider<AuthRepository>((ref) async {
   );
 });
 
-final authMessageProvider = StateProvider<String?>((ref) => null);
-final sessionNoticeProvider = StateProvider<String?>((ref) => null);
+final authMessageProvider =
+    NotifierProvider<AuthMessageNotifier, String?>(AuthMessageNotifier.new);
+final sessionNoticeProvider =
+    NotifierProvider<SessionNoticeNotifier, String?>(SessionNoticeNotifier.new);
+
+class AuthMessageNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? message) => state = message;
+  void clear() => state = null;
+}
+
+class SessionNoticeNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? message) => state = message;
+  void clear() => state = null;
+}
 
 final authSessionProvider =
     AsyncNotifierProvider<AuthSessionController, AuthSession?>(
@@ -60,23 +78,25 @@ class AuthSessionController extends AsyncNotifier<AuthSession?> {
   @override
   Future<AuthSession?> build() async {
     final repo = await ref.watch(authRepositoryProvider.future);
-    ref.read(sessionNoticeProvider.notifier).state = null;
+    ref.read(sessionNoticeProvider.notifier).clear();
     return repo.readCachedSession();
   }
 
   Future<AuthSession> sessionForNetwork() async {
     final current = state.value;
     if (current == null) {
-      ref.read(sessionNoticeProvider.notifier).state =
-          'Session expired. Continue offline or logout to login again.';
+      ref
+          .read(sessionNoticeProvider.notifier)
+          .set('Session expired. Continue offline or logout to login again.');
       throw const SessionExpiredException();
     }
     if (!current.isExpired) return current;
 
     final refreshToken = current.refreshToken;
     if (refreshToken == null || refreshToken.trim().isEmpty) {
-      ref.read(sessionNoticeProvider.notifier).state =
-          'Session expired. Continue offline or logout to login again.';
+      ref
+          .read(sessionNoticeProvider.notifier)
+          .set('Session expired. Continue offline or logout to login again.');
       throw const SessionExpiredException();
     }
 
@@ -86,12 +106,14 @@ class AuthSessionController extends AsyncNotifier<AuthSession?> {
       state = AsyncData(refreshed);
       return refreshed;
     } on AuthRefreshInvalidException {
-      ref.read(sessionNoticeProvider.notifier).state =
-          'Session expired. Continue offline or logout to login again.';
+      ref
+          .read(sessionNoticeProvider.notifier)
+          .set('Session expired. Continue offline or logout to login again.');
       throw const SessionExpiredException();
     } catch (_) {
-      ref.read(sessionNoticeProvider.notifier).state =
-          'No connection. Working offline.';
+      ref
+          .read(sessionNoticeProvider.notifier)
+          .set('No connection. Working offline.');
       throw const NoConnectionException();
     }
   }
@@ -102,8 +124,8 @@ class AuthSessionController extends AsyncNotifier<AuthSession?> {
     required String password,
   }) async {
     final repo = await ref.read(authRepositoryProvider.future);
-    ref.read(authMessageProvider.notifier).state = null;
-    ref.read(sessionNoticeProvider.notifier).state = null;
+    ref.read(authMessageProvider.notifier).clear();
+    ref.read(sessionNoticeProvider.notifier).clear();
     state = const AsyncLoading();
     try {
       final session = await repo.login(
@@ -113,7 +135,7 @@ class AuthSessionController extends AsyncNotifier<AuthSession?> {
       );
       state = AsyncData(session);
     } catch (e) {
-      ref.read(authMessageProvider.notifier).state = _mapAuthError(e);
+      ref.read(authMessageProvider.notifier).set(_mapAuthError(e));
       state = const AsyncData(null);
     }
   }
@@ -121,7 +143,7 @@ class AuthSessionController extends AsyncNotifier<AuthSession?> {
   Future<void> logout() async {
     final repo = await ref.read(authRepositoryProvider.future);
     await repo.logout();
-    ref.read(sessionNoticeProvider.notifier).state = null;
+    ref.read(sessionNoticeProvider.notifier).clear();
     state = const AsyncData(null);
   }
 
