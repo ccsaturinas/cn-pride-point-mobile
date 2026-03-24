@@ -66,7 +66,7 @@ class _ActivityAttendancePageState
               actions: [
                 offlineRepo.when(
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                   data: (repo) {
                     return FutureBuilder<int>(
                       future: repo.pendingCount(),
@@ -100,12 +100,10 @@ class _ActivityAttendancePageState
                                     if (friendlyErrorText(e) ==
                                         'No connection') {
                                       ref
-                                              .read(
-                                                sessionNoticeProvider.notifier,
-                                              )
-                                              .set(
-                                                'No connection. Working offline.',
-                                              );
+                                          .read(sessionNoticeProvider.notifier)
+                                          .set(
+                                            'No connection. Working offline.',
+                                          );
                                     }
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -156,7 +154,7 @@ class _ActivityAttendancePageState
                         child: Column(
                           children: [
                             DropdownButtonFormField<String>(
-                              value: selectedProgram?.id,
+                              initialValue: selectedProgram?.id,
                               items: programs
                                   .map(
                                     (p) => DropdownMenuItem(
@@ -176,7 +174,7 @@ class _ActivityAttendancePageState
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String?>(
-                              value: selectedActivity?.id,
+                              initialValue: selectedActivity?.id,
                               items: [
                                 const DropdownMenuItem<String?>(
                                   value: null,
@@ -273,13 +271,13 @@ class _ActivityAttendancePageState
                                                   if (friendlyErrorText(e) ==
                                                       'No connection') {
                                                     ref
-                                                            .read(
-                                                              sessionNoticeProvider
-                                                                  .notifier,
-                                                            )
-                                                            .set(
-                                                              'No connection. Working offline.',
-                                                            );
+                                                        .read(
+                                                          sessionNoticeProvider
+                                                              .notifier,
+                                                        )
+                                                        .set(
+                                                          'No connection. Working offline.',
+                                                        );
                                                   }
                                                   ScaffoldMessenger.of(
                                                     context,
@@ -400,7 +398,14 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
     return RefreshIndicator(
       onRefresh: () async {
         setState(_reload);
-        await _hostFuture;
+        try {
+          await _hostFuture;
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(friendlyErrorText(e))));
+        }
       },
       child: ListView(
         children: [

@@ -202,7 +202,7 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                   ? const Center(child: Text('No items'))
                   : ListView.separated(
                       itemCount: _items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final item = _items[index];
                         return switch (item) {

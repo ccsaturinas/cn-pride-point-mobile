@@ -14,21 +14,28 @@ class _ScanPageState extends State<ScanPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Scan CODE39')),
-      body: MobileScanner(
-        controller: _controller,
-        onDetect: (capture) {
-          if (_handled) return;
-          final barcodes = capture.barcodes;
-          for (final b in barcodes) {
-            final v = b.rawValue;
-            if (v == null || v.trim().isEmpty) continue;
-            _handled = true;
-            Navigator.of(context).pop(v.trim());
-            return;
-          }
-        },
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        _controller.stop();
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Scan ID barcode')), //CODE39
+        body: MobileScanner(
+          controller: _controller,
+          onDetect: (capture) {
+            if (_handled) return;
+            final barcodes = capture.barcodes;
+            for (final b in barcodes) {
+              final v = b.rawValue;
+              if (v == null || v.trim().isEmpty) continue;
+              _handled = true;
+              _controller.stop();
+              Navigator.of(context).pop(v.trim());
+              return;
+            }
+          },
+        ),
       ),
     );
   }
@@ -40,7 +47,14 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   @override
+  void deactivate() {
+    _controller.stop();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }

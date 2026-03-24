@@ -72,7 +72,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 const SizedBox(height: 16),
                 if (_history.isNotEmpty)
                   DropdownButtonFormField<String>(
-                    value: _history.contains(_hostController.text.trim())
+                    initialValue: _history.contains(_hostController.text.trim())
                         ? _hostController.text.trim()
                         : null,
                     items: _history

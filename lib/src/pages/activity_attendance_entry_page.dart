@@ -66,7 +66,7 @@ class _ActivityAttendanceEntryPageState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: _programId,
+                        initialValue: _programId,
                         items: activePrograms
                             .map(
                               (p) => DropdownMenuItem(
@@ -86,7 +86,7 @@ class _ActivityAttendanceEntryPageState
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String?>(
-                        value: _activityId,
+                        initialValue: _activityId,
                         items: [
                           const DropdownMenuItem<String?>(
                             value: null,
