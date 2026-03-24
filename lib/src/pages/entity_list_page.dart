@@ -11,6 +11,7 @@ import '../ui/date_format.dart';
 import 'attendee_details_page.dart';
 import 'program_details_page.dart';
 import '../ui/screen_title_bar.dart';
+import 'scan_page.dart';
 
 enum EntityType { programs, activities, attendees, sections, yearLevels }
 
@@ -37,16 +38,29 @@ class EntityListPage extends ConsumerStatefulWidget {
 
 class _EntityListPageState extends ConsumerState<EntityListPage> {
   static const _programSortKey = 'program_sort_startdate_asc_v1';
+  static const _attendeeSortKey = 'attendee_sort_displayname_asc_v1';
 
   bool _loading = false;
   String? _error;
 
   List<Object> _items = const [];
   bool _programSortAsc = true;
+  bool _attendeeSortAsc = true;
+  String _attendeeQuery = '';
+  TextEditingController? _attendeeSearchController;
 
   @override
   void initState() {
     super.initState();
+    if (widget.entity == EntityType.attendees) {
+      _attendeeSearchController = TextEditingController();
+      _attendeeSearchController!.addListener(() {
+        final next = _attendeeSearchController!.text;
+        if (next == _attendeeQuery) return;
+        setState(() => _attendeeQuery = next);
+        _loadLocal();
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
@@ -55,7 +69,17 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
       final prefs = await ref.read(sharedPreferencesProvider.future);
       _programSortAsc = prefs.getBool(_programSortKey) ?? true;
     }
+    if (widget.entity == EntityType.attendees) {
+      final prefs = await ref.read(sharedPreferencesProvider.future);
+      _attendeeSortAsc = prefs.getBool(_attendeeSortKey) ?? true;
+    }
     await _loadLocal();
+  }
+
+  @override
+  void dispose() {
+    _attendeeSearchController?.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLocal() async {
@@ -74,7 +98,7 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
           final yearLevelNameById = {for (final y in yearLevels) y.id: y.name};
           final sectionNameById = {for (final s in sections) s.id: s.name};
 
-          return attendees
+          final list = attendees
               .map(
                 (a) => AttendeeViewItem(
                   attendee: a,
@@ -83,6 +107,37 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                 ),
               )
               .toList(growable: false);
+
+          final q = _attendeeQuery.trim().toLowerCase();
+          final filtered = q.isEmpty
+              ? list
+              : list
+                    .where((item) {
+                      final name = (item.attendee.displayName ?? '')
+                          .trim()
+                          .toLowerCase();
+                      final code = (item.attendee.code ?? '')
+                          .trim()
+                          .toLowerCase();
+                      return name.contains(q) || code.contains(q);
+                    })
+                    .toList(growable: false);
+
+          final sortable = filtered.toList(growable: true);
+          sortable.sort((a, b) {
+            final aName = (a.attendee.displayName ?? '').trim().isEmpty
+                ? '${a.attendee.lastName ?? ''} ${a.attendee.firstName ?? ''}'
+                      .trim()
+                : a.attendee.displayName!.trim();
+            final bName = (b.attendee.displayName ?? '').trim().isEmpty
+                ? '${b.attendee.lastName ?? ''} ${b.attendee.firstName ?? ''}'
+                      .trim()
+                : b.attendee.displayName!.trim();
+            final cmp = aName.toLowerCase().compareTo(bName.toLowerCase());
+            return _attendeeSortAsc ? cmp : -cmp;
+          });
+
+          return sortable;
         case EntityType.sections:
           return await repo.listSections();
         case EntityType.yearLevels:
@@ -124,6 +179,25 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
     if (!mounted) return;
     setState(() => _programSortAsc = next);
     await _loadLocal();
+  }
+
+  Future<void> _toggleAttendeeSort() async {
+    final prefs = await ref.read(sharedPreferencesProvider.future);
+    final next = !_attendeeSortAsc;
+    await prefs.setBool(_attendeeSortKey, next);
+    if (!mounted) return;
+    setState(() => _attendeeSortAsc = next);
+    await _loadLocal();
+  }
+
+  Future<void> _scanAndSearchAttendee() async {
+    final code = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const ScanPage()));
+    if (code == null || code.trim().isEmpty) return;
+
+    final scanned = code.trim().replaceAll('*', '');
+    _attendeeSearchController?.text = scanned;
   }
 
   Future<void> _refreshFromHost() async {
@@ -204,6 +278,14 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                         ? 'Sort by Startdate (ASC)'
                         : 'Sort by Startdate (DESC)',
                   ),
+                if (widget.entity == EntityType.attendees)
+                  IconButton(
+                    onPressed: _loading ? null : _toggleAttendeeSort,
+                    icon: const Icon(Icons.sort_by_alpha),
+                    tooltip: _attendeeSortAsc
+                        ? 'Sort by Name (ASC)'
+                        : 'Sort by Name (DESC)',
+                  ),
                 IconButton(
                   onPressed: _loading ? null : _refreshFromHost,
                   icon: const Icon(Icons.refresh),
@@ -211,6 +293,32 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                 ),
               ],
             ),
+            if (widget.entity == EntityType.attendees)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _attendeeSearchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _attendeeSearchController?.clear(),
+                          icon: const Icon(Icons.clear),
+                          tooltip: 'Clear',
+                        ),
+                        IconButton(
+                          onPressed: _scanAndSearchAttendee,
+                          icon: const Icon(Icons.qr_code_scanner),
+                          tooltip: 'Scan ID',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
