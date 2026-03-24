@@ -202,8 +202,22 @@ class EntityDao {
       orderBy: 'lastName ASC, firstName ASC',
     );
     return rows
-        .map(
-          (r) => Attendee(
+        .map((r) {
+          String? attendeeType;
+          String? shirtSize;
+          String? gender;
+          final raw = r['rawJson'] as String?;
+          if (raw != null && raw.trim().isNotEmpty) {
+            try {
+              final decoded = jsonDecode(raw);
+              if (decoded is Map) {
+                attendeeType = decoded['attendeeType']?.toString();
+                shirtSize = decoded['shirtSize']?.toString();
+                gender = decoded['gender']?.toString();
+              }
+            } catch (_) {}
+          }
+          return Attendee(
             id: r['id'] as String,
             code: r['code'] as String?,
             lastName: r['lastName'] as String?,
@@ -214,8 +228,11 @@ class EntityDao {
             sectionId: r['sectionId'] as String?,
             profilePicJson: r['profilePicJson'] as String?,
             status: r['status'] as String?,
-          ),
-        )
+            attendeeType: attendeeType,
+            shirtSize: shirtSize,
+            gender: gender,
+          );
+        })
         .toList(growable: false);
   }
 
@@ -228,6 +245,20 @@ class EntityDao {
     );
     if (rows.isEmpty) return null;
     final r = rows.first;
+    String? attendeeType;
+    String? shirtSize;
+    String? gender;
+    final raw = r['rawJson'] as String?;
+    if (raw != null && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          attendeeType = decoded['attendeeType']?.toString();
+          shirtSize = decoded['shirtSize']?.toString();
+          gender = decoded['gender']?.toString();
+        }
+      } catch (_) {}
+    }
     return Attendee(
       id: r['id'] as String,
       code: r['code'] as String?,
@@ -239,6 +270,9 @@ class EntityDao {
       sectionId: r['sectionId'] as String?,
       profilePicJson: r['profilePicJson'] as String?,
       status: r['status'] as String?,
+      attendeeType: attendeeType,
+      shirtSize: shirtSize,
+      gender: gender,
     );
   }
 

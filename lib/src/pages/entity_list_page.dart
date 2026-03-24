@@ -8,10 +8,23 @@ import '../ui/error_text.dart';
 import '../ui/cn_app_bar.dart';
 import 'activity_details_page.dart';
 import '../ui/date_format.dart';
+import 'attendee_details_page.dart';
 import 'program_details_page.dart';
 import '../ui/screen_title_bar.dart';
 
 enum EntityType { programs, activities, attendees, sections, yearLevels }
+
+class AttendeeViewItem {
+  const AttendeeViewItem({
+    required this.attendee,
+    required this.yearLevelName,
+    required this.sectionName,
+  });
+
+  final Attendee attendee;
+  final String? yearLevelName;
+  final String? sectionName;
+}
 
 class EntityListPage extends ConsumerStatefulWidget {
   const EntityListPage({super.key, required this.entity});
@@ -47,13 +60,35 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
 
   Future<void> _loadLocal() async {
     final repo = await ref.read(entitySyncRepositoryProvider.future);
-    final items = await switch (widget.entity) {
-      EntityType.programs => repo.listPrograms(),
-      EntityType.activities => repo.listActivities(),
-      EntityType.attendees => repo.listAttendees(),
-      EntityType.sections => repo.listSections(),
-      EntityType.yearLevels => repo.listYearLevels(),
-    };
+    final items = await () async {
+      switch (widget.entity) {
+        case EntityType.programs:
+          return await repo.listPrograms();
+        case EntityType.activities:
+          return await repo.listActivities();
+        case EntityType.attendees:
+          final attendees = await repo.listAttendees();
+          final yearLevels = await repo.listYearLevels();
+          final sections = await repo.listSections();
+
+          final yearLevelNameById = {for (final y in yearLevels) y.id: y.name};
+          final sectionNameById = {for (final s in sections) s.id: s.name};
+
+          return attendees
+              .map(
+                (a) => AttendeeViewItem(
+                  attendee: a,
+                  yearLevelName: yearLevelNameById[a.yearLevelId],
+                  sectionName: sectionNameById[a.sectionId],
+                ),
+              )
+              .toList(growable: false);
+        case EntityType.sections:
+          return await repo.listSections();
+        case EntityType.yearLevels:
+          return await repo.listYearLevels();
+      }
+    }();
 
     if (!mounted) return;
     setState(() {
@@ -251,13 +286,35 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                             title: Text(s.name),
                             subtitle: Text(s.status ?? ''),
                           ),
-                          final Attendee a => ListTile(
+                          final AttendeeViewItem item => ListTile(
                             title: Text(
-                              a.displayName ??
-                                  '${a.lastName ?? ''} ${a.firstName ?? ''}'
-                                      .trim(),
+                              (item.attendee.displayName ?? '').trim().isEmpty
+                                  ? '${item.attendee.lastName ?? ''} ${item.attendee.firstName ?? ''}'
+                                        .trim()
+                                  : item.attendee.displayName!.trim(),
                             ),
-                            subtitle: Text(a.code ?? ''),
+                            subtitle: Text(
+                              [
+                                [
+                                  item.attendee.attendeeType ?? '',
+                                  item.attendee.gender ?? '',
+                                ].where((s) => s.trim().isNotEmpty).join(' '),
+                                [
+                                  item.yearLevelName ?? '',
+                                  item.sectionName ?? '',
+                                ].where((s) => s.trim().isNotEmpty).join(' '),
+                              ].where((s) => s.trim().isNotEmpty).join('\n'),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AttendeeDetailsPage(
+                                  attendee: item.attendee,
+                                  yearLevelName: item.yearLevelName,
+                                  sectionName: item.sectionName,
+                                ),
+                              ),
+                            ),
                           ),
                           _ => const SizedBox.shrink(),
                         };

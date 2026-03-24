@@ -66,6 +66,9 @@ class Attendee {
     this.sectionId,
     this.profilePicJson,
     this.status,
+    this.attendeeType,
+    this.shirtSize,
+    this.gender,
   });
 
   final String id;
@@ -78,6 +81,9 @@ class Attendee {
   final String? sectionId;
   final String? profilePicJson;
   final String? status;
+  final String? attendeeType;
+  final String? shirtSize;
+  final String? gender;
 }
 
 enum SyncStatus { pending, synced, error }
