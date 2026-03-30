@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../auth/auth_session.dart';
 import '../auth/providers.dart';
 import '../models/entities.dart';
 import '../repositories/providers.dart';
@@ -68,6 +69,7 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
   bool _attendeeSortAsc = true;
   String _attendeeQuery = '';
   TextEditingController? _attendeeSearchController;
+  String? _activityScheduleProgramId;
 
   @override
   void initState() {
@@ -115,10 +117,17 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
           final programs = await repo.listPrograms();
           final activities = await repo.listActivities();
 
+          final selectedProgramId = (_activityScheduleProgramId ?? '').trim();
           final programNameById = {for (final p in programs) p.id: p.name};
           final activityNameById = {for (final a in activities) a.id: a.name};
 
-          return schedules
+          final filtered = selectedProgramId.isEmpty
+              ? schedules
+              : schedules
+                    .where((s) => s.programId == selectedProgramId)
+                    .toList(growable: false);
+
+          return filtered
               .map(
                 (s) => ActivityScheduleViewItem(
                   schedule: s,
@@ -238,16 +247,26 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
   }
 
   Future<void> _refreshFromHost() async {
-    final session = await () async {
-      try {
-        return await ref.read(authSessionProvider.notifier).sessionForNetwork();
-      } catch (e) {
-        if (mounted) {
-          setState(() => _error = friendlyErrorText(e));
+    AuthSession session;
+    try {
+      session = await ref
+          .read(authSessionProvider.notifier)
+          .sessionForNetwork();
+    } catch (e) {
+      final message = friendlyErrorText(e);
+      if (mounted) {
+        setState(() {
+          _error = message;
+          _loading = false;
+        });
+        if (message == 'No connection') {
+          ref
+              .read(sessionNoticeProvider.notifier)
+              .set('No connection. Working offline.');
         }
-        rethrow;
       }
-    }();
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -359,6 +378,44 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                   ),
                 ),
               ),
+            if (widget.entity == EntityType.activitySchedules)
+              FutureBuilder<List<Program>>(
+                future: ref
+                    .read(entitySyncRepositoryProvider.future)
+                    .then((r) => r.listPrograms()),
+                builder: (context, snapshot) {
+                  final programs = snapshot.data ?? const <Program>[];
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: _activityScheduleProgramId,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All programs'),
+                        ),
+                        ...programs.map(
+                          (p) => DropdownMenuItem<String?>(
+                            value: p.id,
+                            child: Text(
+                              p.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _activityScheduleProgramId = v);
+                        _loadLocal();
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Program',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  );
+                },
+              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -435,7 +492,9 @@ class _EntityListPageState extends ConsumerState<EntityListPage> {
                             subtitle: Text(
                               [
                                 [
-                                  formatDateTimeStringYmdHm(s.schedule.startDate),
+                                  formatDateTimeStringYmdHm(
+                                    s.schedule.startDate,
+                                  ),
                                   formatDateTimeStringYmdHm(s.schedule.endDate),
                                 ].where((t) => t.trim().isNotEmpty).join(' - '),
                                 [

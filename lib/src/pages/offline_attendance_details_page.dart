@@ -13,17 +13,21 @@ class OfflineAttendanceDetailsPage extends ConsumerStatefulWidget {
   final OfflineAttendance attendance;
 
   @override
-  ConsumerState<OfflineAttendanceDetailsPage> createState() => _OfflineAttendanceDetailsPageState();
+  ConsumerState<OfflineAttendanceDetailsPage> createState() =>
+      _OfflineAttendanceDetailsPageState();
 }
 
-class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendanceDetailsPage> {
+class _OfflineAttendanceDetailsPageState
+    extends ConsumerState<OfflineAttendanceDetailsPage> {
   late final TextEditingController _notesController;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _notesController = TextEditingController(text: widget.attendance.notes ?? '');
+    _notesController = TextEditingController(
+      text: widget.attendance.notes ?? '',
+    );
   }
 
   @override
@@ -66,7 +70,8 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
 
                     final programs = snapshot.data![0] as List<Program>;
                     final activities = snapshot.data![1] as List<Activity>;
-                    final schedules = snapshot.data![2] as List<ActivitySchedule>;
+                    final schedules =
+                        snapshot.data![2] as List<ActivitySchedule>;
                     final attendees = snapshot.data![3] as List<Attendee>;
 
                     final schedule = schedules
@@ -84,7 +89,13 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
                         .firstOrNull;
                     final attendeeName = attendees
                         .where((p) => p.id == a.attendeeId)
-                        .map((p) => (p.displayName ?? '${p.lastName ?? ''} ${p.firstName ?? ''}'.trim()).trim())
+                        .map(
+                          (p) =>
+                              (p.displayName ??
+                                      '${p.lastName ?? ''} ${p.firstName ?? ''}'
+                                          .trim())
+                                  .trim(),
+                        )
                         .firstOrNull;
 
                     return Padding(
@@ -96,11 +107,24 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
                           _kv('Sync status', a.syncStatus.name),
                           if ((a.lastSyncError ?? '').trim().isNotEmpty)
                             _kv('Last sync error', a.lastSyncError!),
-                          _kv('Activity schedule', a.activityScheduleId),
-                          _kv('Program', (programName ?? schedule?.programId ?? '-').trim()),
-                          _kv('Activity', (activityName ?? schedule?.activityId ?? '-').trim()),
-                          _kv('Attendee', (attendeeName ?? a.attendeeId).trim()),
-                          _kv('Checked in at', formatDateTimeYmdHm(a.checkedInAt)),
+                          // _kv('Activity schedule', a.activityScheduleId),
+                          _kv(
+                            'Program',
+                            (programName ?? schedule?.programId ?? '-').trim(),
+                          ),
+                          _kv(
+                            'Activity',
+                            (activityName ?? schedule?.activityId ?? '-')
+                                .trim(),
+                          ),
+                          _kv(
+                            'Attendee',
+                            (attendeeName ?? a.attendeeId).trim(),
+                          ),
+                          _kv(
+                            'Checked in at',
+                            formatDateTimeYmdHm(a.checkedInAt),
+                          ),
                           _kv('Status', a.status),
                           const SizedBox(height: 12),
                           TextField(
@@ -120,7 +144,8 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
                                     try {
                                       await repo.updateNotes(
                                         localId: a.localId,
-                                        notes: _notesController.text.trim().isEmpty
+                                        notes:
+                                            _notesController.text.trim().isEmpty
                                             ? null
                                             : _notesController.text.trim(),
                                       );
@@ -128,18 +153,23 @@ class _OfflineAttendanceDetailsPageState extends ConsumerState<OfflineAttendance
                                       Navigator.of(context).pop(true);
                                     } catch (e) {
                                       if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(content: Text(e.toString())),
                                       );
                                     } finally {
-                                      if (mounted) setState(() => _saving = false);
+                                      if (mounted)
+                                        setState(() => _saving = false);
                                     }
                                   },
                             child: _saving
                                 ? const SizedBox(
                                     height: 18,
                                     width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Text('Save'),
                           ),

@@ -589,7 +589,7 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
                         title: Text(i.attendeeDisplayName ?? i.id),
                         subtitle: Text(
                           [
-                            [i.activityName, i.activityScheduleId, i.status]
+                            [i.programName, i.activityName, i.status]
                                 .where(
                                   (e) => (e ?? '').toString().trim().isNotEmpty,
                                 )

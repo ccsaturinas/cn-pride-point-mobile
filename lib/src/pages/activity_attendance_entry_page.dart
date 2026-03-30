@@ -91,7 +91,8 @@ class _ActivityAttendanceEntryPageState
                 final filteredSchedules =
                     schedules
                         .where((s) {
-                          if ((s.status ?? '').toUpperCase() != 'ACTIVE') {
+                          if ((s.status ?? '').trim().toUpperCase() !=
+                              'ACTIVE') {
                             return false;
                           }
                           if (programId.isNotEmpty &&

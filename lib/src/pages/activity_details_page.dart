@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/providers.dart';
 import '../models/entities.dart';
-import '../ui/date_format.dart';
 import '../ui/cn_app_bar.dart';
 
 class ActivityDetailsPage extends ConsumerWidget {
@@ -13,9 +12,6 @@ class ActivityDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final start = formatDateTimeStringYmdHm(activity.startDate);
-    final end = formatDateTimeStringYmdHm(activity.endDate);
-
     return Scaffold(
       appBar: cnAppBar(
         context: context,
@@ -33,8 +29,6 @@ class ActivityDetailsPage extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               _row('Type', activity.activityType),
-              _row('Start', start),
-              _row('End', end),
               _row('Details', activity.details),
             ],
           ),
