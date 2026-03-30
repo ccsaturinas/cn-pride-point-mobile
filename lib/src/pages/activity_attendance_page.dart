@@ -430,18 +430,7 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
                               ),
                               subtitle: Text(
                                 [
-                                  [
-                                        item.programName,
-                                        item.activityName,
-                                        item.attendance.status,
-                                      ]
-                                      .where(
-                                        (e) => (e ?? '')
-                                            .toString()
-                                            .trim()
-                                            .isNotEmpty,
-                                      )
-                                      .join(' • '),
+                                  item.attendance.status,
                                   formatDateTimeYmdHm(
                                     item.attendance.checkedInAt,
                                   ),
@@ -589,11 +578,7 @@ class _HostAndPendingListState extends State<_HostAndPendingList> {
                         title: Text(i.attendeeDisplayName ?? i.id),
                         subtitle: Text(
                           [
-                            [i.programName, i.activityName, i.status]
-                                .where(
-                                  (e) => (e ?? '').toString().trim().isNotEmpty,
-                                )
-                                .join(' • '),
+                            i.status ?? '-',
                             formatDateTimeStringYmdHm(i.checkedInAt),
                           ].where((s) => s.trim().isNotEmpty).join('\n'),
                         ),
